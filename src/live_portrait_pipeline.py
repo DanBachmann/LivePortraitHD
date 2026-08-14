@@ -80,6 +80,8 @@ class LivePortraitPipeline(object):
         device = self.live_portrait_wrapper.device
         crop_cfg = self.cropper.crop_cfg
 
+        #inf_cfg.animation_region = "exp"
+
         ######## load source input ########
         flag_is_source_video = False
         source_fps = None
@@ -245,6 +247,12 @@ class LivePortraitPipeline(object):
                     raise Exception("No face detected in the source image!")
                 source_lmk = crop_info['lmk_crop']
                 img_crop_256x256 = crop_info['img_crop_256x256']
+
+                # --- MSc MATRIX EXTRACTION ---
+                print("Saving crop matrix for high resolution processing")
+                os.makedirs('output/tmp/metadata', exist_ok=True)
+                np.savetxt(f'output/tmp/metadata/M_c2o-{basename(args.source)}-{basename(args.driving)}.txt', crop_info['M_c2o'])
+                # ------------------------------------
             else:
                 source_lmk = self.cropper.calc_lmk_from_cropped_image(source_rgb_lst[0])
                 img_crop_256x256 = cv2.resize(source_rgb_lst[0], (256, 256))  # force to resize to 256x256
@@ -270,8 +278,17 @@ class LivePortraitPipeline(object):
             log(f"The animated video consists of {n_frames} frames.")
         else:
             log(f"The output of image-driven portrait animation is an image.")
+        self.live_portrait_wrapper.warping_module.msc_descriptor = f"{basename(args.source)}-{basename(args.driving)}"
         for i in track(range(n_frames), description='🚀Animating...', total=n_frames):
+            self.live_portrait_wrapper.warping_module.msc_frame_counter = i
             if flag_is_source_video:  # source video
+                # --- DYNAMIC MSc MATRIX EXTRACTION (VIDEO SOURCED) ---
+                os.makedirs('output/tmp/metadata', exist_ok=True)
+                matrix_filename = f"output/tmp/metadata/M_c2o-{basename(args.source)}-{basename(args.driving)}-{i:04d}.txt"
+
+                # We use source_M_c2o_lst[i] to grab the correct matrix for this specific frame
+                np.savetxt(matrix_filename, source_M_c2o_lst[i])
+                # -----------------------------------------------------
                 x_s_info = source_template_dct['motion'][i]
                 x_s_info = dct2device(x_s_info, device)
 
@@ -384,6 +401,7 @@ class LivePortraitPipeline(object):
                     t_new = x_s_info['t']
 
             t_new[..., 2].fill_(0)  # zero tz
+
             x_d_i_new = scale_new * (x_c_s @ R_new + delta_new) + t_new
 
             if inf_cfg.flag_relative_motion and inf_cfg.driving_option == "expression-friendly" and not flag_is_source_video and flag_is_driving_video:
