@@ -14,6 +14,9 @@ from src.config.crop_config import CropConfig
 from src.live_portrait_pipeline import LivePortraitPipeline
 
 
+# for MSC project to hi-jack the warping network for saving the ST maps as EXR files
+os.environ["OPENCV_IO_ENABLE_OPENEXR"] = "1" # set in console before running since this doesn't seem to work when set in the code, but just in case, we set it here as well
+
 def partial_fields(target_class, kwargs):
     return target_class(**{k: v for k, v in kwargs.items() if hasattr(target_class, k)})
 
