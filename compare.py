@@ -23,7 +23,7 @@ def combine_images_side_by_side(image_list, target_h=None):
     target_w = None
     MAX_SIZE = True
 
-    # 1. First Pass: Load images, determine target height, and find the maximum channel depth
+    # Load images, determine target height, and find the maximum channel depth
     if MAX_SIZE and target_h is None:
         for img in image_list:
             # Handle different input types cleanly
@@ -77,7 +77,7 @@ def combine_images_side_by_side(image_list, target_h=None):
 
         processed_images.append(cv_img)
 
-    # 2. Second Pass: Normalize all images to the maximum channel count
+    # Second Pass: Normalize all images to the maximum channel count
     normalized_images = []
     for cv_img in processed_images:
         channels = cv_img.shape[2] if len(cv_img.shape) == 3 else 1
@@ -94,7 +94,7 @@ def combine_images_side_by_side(image_list, target_h=None):
             if channels == 1:
                 normalized_images.append(cv2.cvtColor(cv_img, cv2.COLOR_GRAY2BGR))
 
-    # 3. Stitch them all together horizontally
+    # Stitch them all together horizontally
     combined_image = np.hstack(normalized_images)
 
     # If the input was a PIL image, return a PIL image
