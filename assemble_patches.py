@@ -9,9 +9,9 @@ from PIL import Image
 def add_noise(image_input, intensity_percent=1.0, monochrome=False):
     is_pil = False
 
-    # 1. Handle pipeline input types and safely extract Alpha if it exists
+    # Handle pipeline input types and safely extract Alpha if it exists
     if isinstance(image_input, str):
-        # IMREAD_UNCHANGED forces OpenCV to load the alpha channel if the file has one
+        # OpenCV to load the alpha channel if the file has one
         cv_img = cv2.imread(image_input, cv2.IMREAD_UNCHANGED)
     elif isinstance(image_input, Image.Image):
         is_pil = True
@@ -26,7 +26,7 @@ def add_noise(image_input, intensity_percent=1.0, monochrome=False):
 
     h, w, c = cv_img.shape
 
-    # 2. Isolate the RGB/BGR channels from the Alpha channel
+    # Isolate the RGB/BGR channels from the Alpha channel
     has_alpha = (c == 4)
     if has_alpha:
         alpha_channel = cv_img[:, :, 3]
@@ -37,25 +37,24 @@ def add_noise(image_input, intensity_percent=1.0, monochrome=False):
     # Calculate the maximum pixel value offset
     max_delta = (intensity_percent / 100.0) * 255.0
 
-    # 3. Generate Noise strictly for the 3 color channels
+    # Generate Noise to simulate more texture than we actually have in the inpainted patch.
     if monochrome:
         noise_channel = np.random.uniform(-max_delta, max_delta, (h, w, 1)).astype(np.float32)
         noise = np.repeat(noise_channel, 3, axis=2)
     else:
         noise = np.random.uniform(-max_delta, max_delta, (h, w, 3)).astype(np.float32)
-
-    # 4. Add noise using float32 to prevent standard 8-bit clipping errors
+    # Add noise using float32 to prevent standard 8-bit clipping errors
     noisy_color = color_img.astype(np.float32) + noise
     noisy_color = np.clip(noisy_color, 0, 255).astype(np.uint8)
 
-    # 5. Re-attach the untouched Alpha channel
+    # Re-attach the untouched Alpha channel
     if has_alpha:
         # Stack the 3 noisy color channels with the 1 pristine alpha channel
         final_img = np.dstack((noisy_color, alpha_channel))
     else:
         final_img = noisy_color
 
-    # 6. Return to PIL Image to match your pipeline's synthesis outputs
+    # Return to PIL Image to match your pipeline's synthesis outputs
     if is_pil:
         if has_alpha:
             return Image.fromarray(cv2.cvtColor(final_img, cv2.COLOR_BGRA2RGBA))
@@ -81,7 +80,7 @@ def combine_images(output_path, layer_data):
     canvas = Image.new("RGBA", first_img.size, (0, 0, 0, 0))
 
     def add_image_to_canvas(base_canvas, img_input, mask_input=None):
-        # 1. Load the main image
+        # Load the main image
         if isinstance(img_input, str):
             img = Image.open(img_input)
         else:
@@ -89,7 +88,7 @@ def combine_images(output_path, layer_data):
 
         active_mask = None
 
-        # 2. Determine Mask Logic
+        # Determine Mask Logic
         if mask_input is not None:
             if isinstance(mask_input, str):
                 active_mask = Image.open(mask_input).convert("L")
@@ -104,13 +103,13 @@ def combine_images(output_path, layer_data):
         else:
             img = img.convert("RGB")
 
-        # 3. Handle resizing
+        # Handle resizing
         if img.size != base_canvas.size:
             img = img.resize(base_canvas.size, Image.Resampling.LANCZOS)
             if active_mask:
                 active_mask = active_mask.resize(base_canvas.size, Image.Resampling.LANCZOS)
 
-        # 4. Paste onto the canvas
+        # Paste onto the canvas
         base_canvas.paste(img, (0, 0), active_mask)
         return base_canvas
 
@@ -168,7 +167,7 @@ def fade_patch_corners(patch, corner_radius=200, blur_size=151, left_fade=0, rig
     if patch.shape[2] == 3:
         patch = cv2.cvtColor(patch, cv2.COLOR_BGR2BGRA)
 
-    # 1. Base Geometry: Optional rounded top corners
+    # Base Geometry: Optional rounded top corners
     if corner_radius > 0:
         corner_mask_u8 = np.zeros((h, w), dtype=np.uint8)
         cv2.rectangle(corner_mask_u8, (0, corner_radius), (w, h), 255, -1)
@@ -190,7 +189,7 @@ def fade_patch_corners(patch, corner_radius=200, blur_size=151, left_fade=0, rig
         # 3t^2 - 2t^3: Eases in from 0 and eases out into 1
         return t * t * (3.0 - 2.0 * t)
 
-    # 2. Precise Directional Ramps (0.0 at outer edge -> 1.0 at fade_distance)
+    # Precise Directional Ramps (0.0 at outer edge -> 1.0 at fade_distance)
     y_indices = np.arange(h, dtype=np.float32)
     x_indices = np.arange(w, dtype=np.float32)
 
@@ -203,10 +202,10 @@ def fade_patch_corners(patch, corner_radius=200, blur_size=151, left_fade=0, rig
     # Combine edge ramps (multiplication creates smooth 2D falloffs in corners)
     edge_gradient = top_ramp * bottom_ramp * left_ramp * right_ramp
 
-    # 3. Combine corner geometry with directional edge gradients
+    # Combine corner geometry with directional edge gradients
     final_gradient = base_mask * edge_gradient
 
-    # 4. Multiply gradient against the patch's existing alpha channel
+    # Multiply gradient against the patch's existing alpha channel
     current_alpha = patch[:, :, 3].astype(np.float32) / 255.0
     patch[:, :, 3] = np.clip(current_alpha * final_gradient * 255.0, 0, 255).astype(np.uint8)
 
@@ -217,7 +216,7 @@ def add_patch(canvas, patch_data, heavy_fade, alpha_path, patch_path):
     # Load with UNCHANGED to preserve any existing alpha channel
     if not os.path.exists(patch_path):
         raise FileNotFoundError(f"Missing file: {patch_path}. Run the extraction script first.")
-    # add some noise for the illusion of texture on the inpainting to help with the blending with the other details
+    # Add some noise for the illusion of texture on the inpainting to help with the blending with the other details
     inpainted_patch = add_noise(cv2.imread(patch_path, cv2.IMREAD_UNCHANGED), intensity_percent=2, monochrome=True)
     if inpainted_patch.shape[2] == 3 and alpha_path:
         alpha = cv2.imread(alpha_path, cv2.IMREAD_GRAYSCALE)
@@ -304,19 +303,18 @@ def local_color_transfer(source_4k, target_lp, kernel_size=15):
     return np.clip(matched_lp, 0, 255).astype(np.uint8)
 
 def straight_alpha_composite(img_4k, img_inpainted_rgba, blur_sigma=15, lf_tolerance=0.05):
-    # 1. Split Alpha and RGB (Assuming input is already unmultiplied)
+    # Split Alpha and RGB (Assuming input is already unmultiplied)
     alpha = img_inpainted_rgba[:, :, 3].astype(np.float32) / 255.0
     img_inpainted = img_inpainted_rgba[:, :, :3].astype(np.float32)
     img_4k = img_4k.astype(np.float32)
 
-    # 2. Detail Layer Selection (The HF sanity check)
+    # Detail Layer Selection (The HF sanity check)
     base_4k = cv2.GaussianBlur(img_4k, (0, 0), sigmaX=blur_sigma)
     base_inpaint = cv2.GaussianBlur(img_inpainted, (0, 0), sigmaX=blur_sigma)
     detail_4k = img_4k - base_4k
     detail_inpaint = img_inpainted - base_inpaint
-    hf_selection = (np.mean(np.abs(detail_4k), axis=2) > np.mean(np.abs(detail_inpaint), axis=2)).astype(np.float32)
 
-    # 3. Straight Alpha Blend
+    # Straight Alpha Blend
     # This ignores the 'fringing' and just performs a clean cut.
     # We expand the alpha slightly to ensure the AI 'repair' covers the warp tear completely.
     alpha_kernel = np.ones((5,5), np.uint8)
@@ -342,20 +340,24 @@ def assemble_and_warp_simple1(source_img, patches, skin_rgba_path, M_c2o_512, fi
 
 def assemble_and_warp_simple2(source_img, patches, skin_rgba_path, M_c2o_512, final_output_path):
     background_rgb = cv2.imread(skin_rgba_path, cv2.IMREAD_UNCHANGED)[:, :, :3]
-    # 1. Extract the RGB channels and the Alpha channel from the foreground
+    # Extract the RGB channels and the Alpha channel from the foreground
     fg_rgb = patches[:, :, :3]
     alpha_channel = patches[:, :, 3]
-    # 2. Normalize the alpha channel to a float between 0.0 and 1.0
+
+    # Normalize the alpha channel to a float between 0.0 and 1.0
     # Expand dimensions so it can broadcast mathematically against the 3 color channels
     alpha_f = alpha_channel.astype(np.float32) / 255.0
     alpha_f = np.expand_dims(alpha_f, axis=-1)
-    # 3. Convert image arrays to float32 to prevent 8-bit math overflow/clipping
+
+    # Convert image arrays to float32 to prevent 8-bit math overflow/clipping
     bg_f = background_rgb.astype(np.float32)
     fg_f = fg_rgb.astype(np.float32)
-    # 4. The Alpha Blending Equation:
+
+    # The Alpha Blending Equation:
     # Output = (Foreground * Alpha) + (Background * (1.0 - Alpha))
     composited_f = (fg_f * alpha_f) + (bg_f * (1.0 - alpha_f))
-    # 5. Clip the results to the valid 0-255 range and lock back to 8-bit uint8
+
+    # Clip the results to the valid 0-255 range and lock back to 8-bit uint8
     composited_8u = np.clip(composited_f, 0, 255).astype(np.uint8)
     warp_sandwich(source_img, composited_8u, M_c2o_512, final_output_path)
 
@@ -367,15 +369,15 @@ def assemble_laplacian(patches, skin_path):
     """
     background_rgb = cv2.imread(skin_path, cv2.IMREAD_UNCHANGED)[:, :, :3]
 
-    # 1. Extract RGB and Alpha from the foreground (Source)
+    # Extract RGB and Alpha from the foreground (Source)
     fg_rgb = patches[:, :, :3]
     mask_8u = patches[:, :, 3]
 
-    # Quick optimization: If mask is entirely empty, return background
+    # If mask is entirely empty, return background
     if cv2.countNonZero(mask_8u) == 0:
         return background_rgb.copy()
 
-    # 2. Convert to float32 [0.0, 1.0] and shift to LAB color space
+    # Convert to float32 [0.0, 1.0] and shift to LAB color space
     # LAB separates Lightness from Color, preventing weird saturation spikes during blending
     bg_f = background_rgb.astype(np.float32) / 255.0
     fg_f = fg_rgb.astype(np.float32) / 255.0
@@ -387,10 +389,10 @@ def assemble_laplacian(patches, skin_path):
     mask_3c = cv2.cvtColor(mask_8u, cv2.COLOR_GRAY2BGR)
     mask_f = mask_3c.astype(np.float32) / 255.0
 
-    # 3. Reduce pyramid depth from 6 to 4 to prevent the lip color from spreading too far
+    # Reduce pyramid depth from 6 to 4 to prevent the lip color from spreading too far
     num_levels = 4
 
-    # 4. Build Gaussian Pyramids
+    # Build Gaussian Pyramids
     gp_fg = [fg_lab]
     gp_bg = [bg_lab]
     gp_mask = [mask_f]
@@ -400,7 +402,7 @@ def assemble_laplacian(patches, skin_path):
         gp_bg.append(cv2.pyrDown(gp_bg[-1]))
         gp_mask.append(cv2.pyrDown(gp_mask[-1]))
 
-    # 5. Build Laplacian Pyramids for Foreground and Background
+    # Build Laplacian Pyramids for Foreground and Background
     lp_fg = [gp_fg[-1]]
     lp_bg = [gp_bg[-1]]
 
@@ -411,21 +413,21 @@ def assemble_laplacian(patches, skin_path):
         lp_fg.append(L_fg)
         lp_bg.append(L_bg)
 
-    # 6. Blend the Laplacian Pyramids
+    # Blend the Laplacian Pyramids
     LS = []
     for i in range(num_levels + 1):
         mask_level = gp_mask[num_levels - i]
         blended_level = (lp_fg[i] * mask_level) + (lp_bg[i] * (1.0 - mask_level))
         LS.append(blended_level)
 
-    # 7. Reconstruct the final image
+    # Reconstruct the final image
     reconstructed_lab = LS[0]
     for i in range(1, num_levels + 1):
         size = (LS[i].shape[1], LS[i].shape[0])
         reconstructed_lab = cv2.pyrUp(reconstructed_lab, dstsize=size)
         reconstructed_lab = cv2.add(reconstructed_lab, LS[i])
 
-    # 8. Convert back to BGR and clip to 8-bit
+    # Convert back to BGR and clip to 8-bit
     reconstructed_bgr = cv2.cvtColor(reconstructed_lab, cv2.COLOR_Lab2BGR)
     composited_8u = np.clip(reconstructed_bgr * 255.0, 0, 255).astype(np.uint8)
 
@@ -440,7 +442,7 @@ def assemble_laplacian_rgb(patches, skin_path):
     """
     background_rgb = cv2.imread(skin_path, cv2.IMREAD_UNCHANGED)[:, :, :3]
 
-    # 1. Extract RGB and Alpha from the foreground (Source)
+    # Extract RGB and Alpha from the foreground (Source)
     fg_rgb = patches[:, :, :3]
     mask_8u = patches[:, :, 3]
 
@@ -448,7 +450,7 @@ def assemble_laplacian_rgb(patches, skin_path):
     if cv2.countNonZero(mask_8u) == 0:
         return background_rgb.copy()
 
-    # 2. Convert to float32 [0.0, 1.0] and shift to LAB color space
+    # Convert to float32 [0.0, 1.0] and shift to LAB color space
     # LAB separates Lightness from Color, preventing weird saturation spikes during blending
     bg_f = background_rgb.astype(np.float32) / 255.0
     fg_f = fg_rgb.astype(np.float32) / 255.0
@@ -460,10 +462,10 @@ def assemble_laplacian_rgb(patches, skin_path):
     mask_3c = cv2.cvtColor(mask_8u, cv2.COLOR_GRAY2BGR)
     mask_f = mask_3c.astype(np.float32) / 255.0
 
-    # 3. Reduce pyramid depth from 6 to 4 to prevent the lip color from spreading too far
+    # Reduce pyramid depth from 6 to 4 to prevent the lip color from spreading too far
     num_levels = 4
 
-    # 4. Build Gaussian Pyramids
+    # Build Gaussian Pyramids
     gp_fg = [fg_lab]
     gp_bg = [bg_lab]
     gp_mask = [mask_f]
@@ -473,7 +475,7 @@ def assemble_laplacian_rgb(patches, skin_path):
         gp_bg.append(cv2.pyrDown(gp_bg[-1]))
         gp_mask.append(cv2.pyrDown(gp_mask[-1]))
 
-    # 5. Build Laplacian Pyramids for Foreground and Background
+    # Build Laplacian Pyramids for Foreground and Background
     lp_fg = [gp_fg[-1]]
     lp_bg = [gp_bg[-1]]
 
@@ -484,21 +486,21 @@ def assemble_laplacian_rgb(patches, skin_path):
         lp_fg.append(L_fg)
         lp_bg.append(L_bg)
 
-    # 6. Blend the Laplacian Pyramids
+    # Blend the Laplacian Pyramids
     LS = []
     for i in range(num_levels + 1):
         mask_level = gp_mask[num_levels - i]
         blended_level = (lp_fg[i] * mask_level) + (lp_bg[i] * (1.0 - mask_level))
         LS.append(blended_level)
 
-    # 7. Reconstruct the final image
+    # Reconstruct the final image
     reconstructed_lab = LS[0]
     for i in range(1, num_levels + 1):
         size = (LS[i].shape[1], LS[i].shape[0])
         reconstructed_lab = cv2.pyrUp(reconstructed_lab, dstsize=size)
         reconstructed_lab = cv2.add(reconstructed_lab, LS[i])
 
-    # 8. Convert back to BGR and clip to 8-bit
+    # Convert back to BGR and clip to 8-bit
     reconstructed_bgr = cv2.cvtColor(reconstructed_lab, cv2.COLOR_Lab2BGR)
     composited_8u = np.clip(reconstructed_bgr * 255.0, 0, 255).astype(np.uint8)
 
@@ -507,7 +509,7 @@ def assemble_laplacian_rgb(patches, skin_path):
 def assemble_simple(patches, skin_path):
     background_rgb = cv2.imread(skin_path, cv2.IMREAD_UNCHANGED)[:, :, :3]
 
-    # 1. Extract RGB and Alpha from the foreground (Source)
+    # Extract RGB and Alpha from the foreground (Source)
     fg_rgb = patches[:, :, :3].copy()
     mask = patches[:, :, 3]  # Your alpha channel is now your binary mask
 

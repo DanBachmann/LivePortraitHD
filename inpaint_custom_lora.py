@@ -144,7 +144,7 @@ def synthesize_patch(pipe, inference_steps, region_name, image_paths, mask_paths
     controlnet_conditioning_scale=eye_controlnet_scale
     negative_prompt = "muscular, cartoon, 3d render, spots, dots, speckled, bumps, disease, saliva, wet, bubbles, excessive specular highlights, white noise, textured tongue, plastic, blurry, yellow reflection, colored lights, unnatural specular highlights, low quality, low resolution, jpeg artifacts, overexposed, underexposed, distorted, unrealistic, ribbed tongue, hairy tongue"
 
-    # 1. ADDED TRIGGER WORDS AND DYNAMIC ADAPTER SWITCHING
+    # TRIGGER WORDS AND DYNAMIC ADAPTER SWITCHING
     if "mouth" in region_name.lower():
         prompt = "QMULHD, photorealistic lips, realistic teeth, high quality, 8k resolution, mouth"
         ip_adapter_scale = 0.2
@@ -211,7 +211,7 @@ def batch_data(data_list, batch_size):
     for i in range(0, len(data_list), batch_size):
         yield data_list[i:i + batch_size]
 
-def do_inpainting(diffusion_model, source_file_path, driver_file_path, 
+def do_inpainting(diffusion_model, source_file_path, driver_file_path,
                 use_lora=False, load_ip_adapter=True, use_spectral_hook=True,
                 mouth_lora_weight=0.45,
                 eye_lora_weight=0.45,
