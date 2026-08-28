@@ -1,6 +1,7 @@
 MIT License
 
 Copyright (c) 2024 Kuaishou Visual Generation and Interaction Center
+LivePortraitHD extension Copyright (c) 2026 Dan Bachmann
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -25,6 +26,6 @@ SOFTWARE.
 The code of InsightFace is released under the MIT License.
 The models of InsightFace are for non-commercial research purposes only.
 
-If you want to use the LivePortrait project for commercial purposes, you 
-should remove and replace InsightFace’s detection models to fully comply with 
+If you want to use the LivePortraitHD project for commercial purposes, you
+should remove and replace InsightFace’s detection models to fully comply with
 the MIT license.
