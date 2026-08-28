@@ -33,12 +33,12 @@ The original LivePortrait code has been slightly modified to expose expression t
 > Make sure your system has [`git`](https://git-scm.com/), [`conda`](https://anaconda.org/anaconda/conda), and [`FFmpeg`](https://ffmpeg.org/download.html) installed. For details on FFmpeg installation, see [**how to install FFmpeg**](assets/docs/how-to-install-ffmpeg.md).
 
 ```bash
-git clone https://github.com/KlingTeam/LivePortrait
-cd LivePortrait
+git clone https://github.com/DanBachmann/LivePortraitHD
+cd LivePortraitHD
 
 # create env using conda
-conda create -n LivePortrait python=3.10
-conda activate LivePortrait
+conda create -n LivePortraitHD python=3.10
+conda activate LivePortraitHD
 ```
 
 #### For Linux 🐧 or Windows 🪟 Users
